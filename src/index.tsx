@@ -22,6 +22,7 @@ type TrailerHeroSettings = {
   blockedApps: number[];
   homeHeroEnabled: boolean;
   logoAssistEnabled: boolean;
+  stopOnLaunchEnabled: boolean;
   crtLowResEnabled: boolean;
   youtubeEnabled: boolean;
   youtubeAutoSearch: boolean;
@@ -116,7 +117,7 @@ type Snapshot = {
 
 const SETTINGS_KEY = "trailerhero.settings.v1";
 const DEFAULT_SETTINGS: TrailerHeroSettings = {
-  settingsVersion: 2,
+  settingsVersion: 3,
   enabled: true,
   delaySeconds: 8,
   opacity: 0.92,
@@ -124,6 +125,7 @@ const DEFAULT_SETTINGS: TrailerHeroSettings = {
   blockedApps: [],
   homeHeroEnabled: true,
   logoAssistEnabled: true,
+  stopOnLaunchEnabled: true,
   crtLowResEnabled: true,
   youtubeEnabled: true,
   youtubeAutoSearch: true,
@@ -217,6 +219,9 @@ function parseSettings(): TrailerHeroSettings {
       logoAssistEnabled: typeof parsed.logoAssistEnabled === "boolean"
         ? parsed.logoAssistEnabled
         : DEFAULT_SETTINGS.logoAssistEnabled,
+      stopOnLaunchEnabled: typeof parsed.stopOnLaunchEnabled === "boolean"
+        ? parsed.stopOnLaunchEnabled
+        : DEFAULT_SETTINGS.stopOnLaunchEnabled,
       crtLowResEnabled: parsedVersion >= 2 && typeof parsed.crtLowResEnabled === "boolean"
         ? parsed.crtLowResEnabled
         : DEFAULT_SETTINGS.crtLowResEnabled,
@@ -321,6 +326,8 @@ const TRANSLATIONS = {
     loadingYouTubeTrailer: "Loading YouTube trailer",
     logoAssist: "Game page logo",
     logoAssistHelp: "When the trailer starts on a game page, move the Steam logo to the bottom-left and restore it when you leave.",
+    stopOnLaunch: "Stop trailer on Play",
+    stoppedForLaunch: "Trailer stopped for launch",
     mediaSourceUnavailable: "MediaSource is not available",
     noGameRecognized: "No game recognized",
     noReadableYouTubeResults: "No readable YouTube results",
@@ -391,6 +398,8 @@ const TRANSLATIONS = {
     loadingYouTubeTrailer: "Carico trailer YouTube",
     logoAssist: "Logo pagina gioco",
     logoAssistHelp: "Quando parte il trailer nella pagina gioco, sposta il logo Steam in basso a sinistra e lo ripristina uscendo.",
+    stopOnLaunch: "Ferma su Gioca",
+    stoppedForLaunch: "Trailer fermato per l'avvio",
     mediaSourceUnavailable: "MediaSource non disponibile",
     noGameRecognized: "Nessun gioco riconosciuto",
     noReadableYouTubeResults: "Nessun risultato YouTube leggibile",
@@ -461,6 +470,8 @@ const TRANSLATIONS = {
     loadingYouTubeTrailer: "Chargement du trailer YouTube",
     logoAssist: "Logo page jeu",
     logoAssistHelp: "Quand le trailer démarre sur une page jeu, déplace le logo Steam en bas à gauche puis le restaure en quittant.",
+    stopOnLaunch: "Arrêter au lancement",
+    stoppedForLaunch: "Trailer arrêté pour le lancement",
     mediaSourceUnavailable: "MediaSource indisponible",
     noGameRecognized: "Aucun jeu reconnu",
     noReadableYouTubeResults: "Aucun résultat YouTube lisible",
@@ -531,6 +542,8 @@ const TRANSLATIONS = {
     loadingYouTubeTrailer: "Cargando tráiler de YouTube",
     logoAssist: "Logo página del juego",
     logoAssistHelp: "Cuando empieza el tráiler en una página de juego, mueve el logo de Steam abajo a la izquierda y lo restaura al salir.",
+    stopOnLaunch: "Detener al jugar",
+    stoppedForLaunch: "Tráiler detenido para iniciar",
     mediaSourceUnavailable: "MediaSource no disponible",
     noGameRecognized: "No se reconoció ningún juego",
     noReadableYouTubeResults: "No hay resultados legibles de YouTube",
@@ -601,6 +614,8 @@ const TRANSLATIONS = {
     loadingYouTubeTrailer: "A carregar trailer do YouTube",
     logoAssist: "Logo da página do jogo",
     logoAssistHelp: "Quando o trailer começa numa página de jogo, move o logo Steam para baixo à esquerda e restaura ao sair.",
+    stopOnLaunch: "Parar ao jogar",
+    stoppedForLaunch: "Trailer parado para iniciar",
     mediaSourceUnavailable: "MediaSource indisponível",
     noGameRecognized: "Nenhum jogo reconhecido",
     noReadableYouTubeResults: "Nenhum resultado legível do YouTube",
@@ -671,6 +686,8 @@ const TRANSLATIONS = {
     loadingYouTubeTrailer: "Carregando trailer do YouTube",
     logoAssist: "Logo da página do jogo",
     logoAssistHelp: "Quando o trailer começa na página do jogo, move o logo Steam para baixo à esquerda e restaura ao sair.",
+    stopOnLaunch: "Parar ao jogar",
+    stoppedForLaunch: "Trailer parado para iniciar",
     mediaSourceUnavailable: "MediaSource indisponível",
     noGameRecognized: "Nenhum jogo reconhecido",
     noReadableYouTubeResults: "Nenhum resultado legível do YouTube",
@@ -741,6 +758,8 @@ const TRANSLATIONS = {
     loadingYouTubeTrailer: "YouTube-Trailer wird geladen",
     logoAssist: "Logo auf Spielseite",
     logoAssistHelp: "Wenn der Trailer auf einer Spielseite startet, wird das Steam-Logo nach unten links verschoben und beim Verlassen wiederhergestellt.",
+    stopOnLaunch: "Trailer beim Spielen stoppen",
+    stoppedForLaunch: "Trailer zum Start gestoppt",
     mediaSourceUnavailable: "MediaSource nicht verfügbar",
     noGameRecognized: "Kein Spiel erkannt",
     noReadableYouTubeResults: "Keine lesbaren YouTube-Ergebnisse",
@@ -811,6 +830,8 @@ const TRANSLATIONS = {
     loadingYouTubeTrailer: "YouTube-trailer laden",
     logoAssist: "Logo gamepagina",
     logoAssistHelp: "Wanneer de trailer op een gamepagina start, wordt het Steam-logo linksonder gezet en bij verlaten hersteld.",
+    stopOnLaunch: "Stop trailer bij spelen",
+    stoppedForLaunch: "Trailer gestopt voor starten",
     mediaSourceUnavailable: "MediaSource niet beschikbaar",
     noGameRecognized: "Geen game herkend",
     noReadableYouTubeResults: "Geen leesbare YouTube-resultaten",
@@ -881,6 +902,8 @@ const TRANSLATIONS = {
     loadingYouTubeTrailer: "Завантаження трейлера YouTube",
     logoAssist: "Логотип сторінки гри",
     logoAssistHelp: "Коли трейлер запускається на сторінці гри, логотип Steam переноситься вниз ліворуч і відновлюється після виходу.",
+    stopOnLaunch: "Зупиняти трейлер під час запуску",
+    stoppedForLaunch: "Трейлер зупинено для запуску",
     mediaSourceUnavailable: "MediaSource недоступний",
     noGameRecognized: "Гру не розпізнано",
     noReadableYouTubeResults: "Немає придатних результатів YouTube",
@@ -951,6 +974,8 @@ const TRANSLATIONS = {
     loadingYouTubeTrailer: "正在加载 YouTube 预告片",
     logoAssist: "游戏页 Logo",
     logoAssistHelp: "游戏页预告片开始时，将 Steam Logo 移到左下角，并在离开时恢复。",
+    stopOnLaunch: "启动时停止预告片",
+    stoppedForLaunch: "预告片已为启动停止",
     mediaSourceUnavailable: "MediaSource 不可用",
     noGameRecognized: "未识别到游戏",
     noReadableYouTubeResults: "没有可读取的 YouTube 结果",
@@ -1021,6 +1046,8 @@ const TRANSLATIONS = {
     loadingYouTubeTrailer: "YouTube トレーラーを読み込み中",
     logoAssist: "ゲームページのロゴ",
     logoAssistHelp: "ゲームページでトレーラーが始まると Steam ロゴを左下へ移動し、ページを離れると元に戻します。",
+    stopOnLaunch: "プレイ時にトレーラーを停止",
+    stoppedForLaunch: "起動のためトレーラーを停止しました",
     mediaSourceUnavailable: "MediaSource は利用できません",
     noGameRecognized: "ゲームを認識できません",
     noReadableYouTubeResults: "読み取れる YouTube 結果がありません",
@@ -1215,7 +1242,7 @@ function isRuntimeSnapshot(value: unknown): value is RuntimeSnapshot {
 
 function trailerHeroRuntimeFactory(nextSettings: TrailerHeroSettings, injectedTranslations: TranslationTable): RuntimeSnapshot {
   const runtimeKey = "__trailerHeroRuntime";
-  const runtimeVersion = "0.1.3";
+  const runtimeVersion = "0.1.4";
   const styleId = "trailerhero-style";
   const videoClass = "trailerhero-video";
   const youtubeClass = "trailerhero-youtube";
@@ -1231,6 +1258,9 @@ function trailerHeroRuntimeFactory(nextSettings: TrailerHeroSettings, injectedTr
   const visibleClass = "trailerhero-visible";
   const defaultTrimStartSeconds = 4;
   const defaultTrimEndSeconds = 5;
+  const scanIntervalMs = 2400;
+  const scanQueueDelayMs = 360;
+  const launchSuppressionMs = 22000;
   const youtubeUiSettleMs = 3200;
   const translations = injectedTranslations;
 
@@ -1554,6 +1584,56 @@ function trailerHeroRuntimeFactory(nextSettings: TrailerHeroSettings, injectedTr
     const hasGamePageText = /\b(achievements|activity|dlc|community|obiettivi|attivit|collezione|controller)\b/.test(bodyText);
 
     return hasActionText && hasGamePageText;
+  }
+
+  function normalizeActionText(value: string): string {
+    return value
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+  }
+
+  function isLaunchActionElement(target: HTMLElement): boolean {
+    const control = target.closest<HTMLElement>(
+      "button, a, [role='button'], [tabindex], [class*='Button'], [class*='button']"
+    );
+    if (!control) {
+      return false;
+    }
+
+    const rect = control.getBoundingClientRect();
+    if (rect.width < 44 || rect.height < 28 || rect.bottom < 0 || rect.top > window.innerHeight) {
+      return false;
+    }
+
+    const text = normalizeActionText([
+      control.innerText,
+      control.textContent,
+      control.getAttribute("aria-label"),
+      control.getAttribute("title")
+    ].filter(Boolean).join(" "));
+    if (!text || text.length > 96) {
+      return false;
+    }
+
+    const actionPattern = /\b(play|launch|install|resume|update|stream|gioca|avvia|installa|riprendi|aggiorna|jouer|lancer|installer|reprendre|mettre a jour|jugar|iniciar|instalar|reanudar|actualizar|jogar|continuar|atualizar|spielen|installieren|fortsetzen|aktualisieren|spelen|installeren|hervatten|bijwerken|грати|запустити|встановити|продовжити|оновити)\b/;
+    if (actionPattern.test(text)) {
+      return true;
+    }
+
+    return [
+      "开始游戏",
+      "开始",
+      "安装",
+      "继续",
+      "更新",
+      "プレイ",
+      "起動",
+      "インストール",
+      "再開"
+    ].some((word) => text.includes(word));
   }
 
   function isLibraryHomePage(): boolean {
@@ -2167,6 +2247,7 @@ function trailerHeroRuntimeFactory(nextSettings: TrailerHeroSettings, injectedTr
     private pendingTarget?: HTMLElement;
     private pendingRequestToken?: number;
     private scanQueued = false;
+    private launchSuppressedUntil = 0;
 
     constructor(settings: TrailerHeroSettings) {
       this.settings = settings;
@@ -2178,17 +2259,29 @@ function trailerHeroRuntimeFactory(nextSettings: TrailerHeroSettings, injectedTr
       if (this.settings.youtubeEnabled) {
         this.ensureYouTubePreconnect();
       }
-      this.observer = new MutationObserver(() => this.queueScan());
+      this.observer = new MutationObserver((mutations) => {
+        if (mutations.some((mutation) => this.shouldQueueScanForMutation(mutation))) {
+          this.queueScan();
+        }
+      });
       this.observer.observe(document.body, {
         childList: true,
         subtree: true,
         attributes: true,
         attributeFilter: ["style", "src", "href", "class"]
       });
+      document.addEventListener("pointerdown", this.handleLaunchIntent, true);
+      document.addEventListener("click", this.handleLaunchIntent, true);
+      document.addEventListener("keydown", this.handleLaunchKeyDown, true);
       window.addEventListener("hashchange", this.handleRouteChange);
       window.addEventListener("popstate", this.handleRouteChange);
       window.addEventListener("beforeunload", this.handleBeforeUnload);
-      this.scanTimer = setInterval(() => this.scan(), 1400);
+      document.addEventListener("visibilitychange", this.handleVisibilityChange);
+      this.scanTimer = setInterval(() => {
+        if (!document.hidden) {
+          this.scan();
+        }
+      }, scanIntervalMs);
       this.scan();
     }
 
@@ -2259,6 +2352,10 @@ function trailerHeroRuntimeFactory(nextSettings: TrailerHeroSettings, injectedTr
       window.removeEventListener("hashchange", this.handleRouteChange);
       window.removeEventListener("popstate", this.handleRouteChange);
       window.removeEventListener("beforeunload", this.handleBeforeUnload);
+      document.removeEventListener("pointerdown", this.handleLaunchIntent, true);
+      document.removeEventListener("click", this.handleLaunchIntent, true);
+      document.removeEventListener("keydown", this.handleLaunchKeyDown, true);
+      document.removeEventListener("visibilitychange", this.handleVisibilityChange);
       this.cleanupVideo();
       document.getElementById(styleId)?.remove();
     }
@@ -2274,6 +2371,7 @@ function trailerHeroRuntimeFactory(nextSettings: TrailerHeroSettings, injectedTr
     }
 
     private handleRouteChange = () => {
+      this.launchSuppressedUntil = 0;
       this.cleanupVideo(true);
       this.queueScan();
     };
@@ -2281,6 +2379,62 @@ function trailerHeroRuntimeFactory(nextSettings: TrailerHeroSettings, injectedTr
     private handleBeforeUnload = () => {
       void this.restoreSteamLogoPosition();
     };
+
+    private handleVisibilityChange = () => {
+      if (!document.hidden) {
+        this.queueScan();
+      }
+    };
+
+    private handleLaunchIntent = (event: Event) => {
+      this.stopTrailerForLaunch(event.target);
+    };
+
+    private handleLaunchKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Enter" && event.key !== " ") {
+        return;
+      }
+
+      this.stopTrailerForLaunch(event.target ?? document.activeElement);
+    };
+
+    private shouldQueueScanForMutation(mutation: MutationRecord): boolean {
+      const target = mutation.target instanceof HTMLElement ? mutation.target : undefined;
+      if (target?.closest(`.${videoClass}, .${youtubeMaskClass}, .${logoClass}`)) {
+        return false;
+      }
+
+      if (mutation.type === "attributes" && target) {
+        const assetText = getElementAssetText(target).toLowerCase();
+        const className = String(target.getAttribute("class") ?? "").toLowerCase();
+        return (
+          assetText.includes("library_hero") ||
+          assetText.includes("_hero") ||
+          assetText.includes("customimages") ||
+          assetText.includes("library_capsule") ||
+          className.includes("focus") ||
+          className.includes("selected")
+        );
+      }
+
+      return true;
+    }
+
+    private stopTrailerForLaunch(target: EventTarget | null) {
+      if (
+        !this.settings.stopOnLaunchEnabled ||
+        !this.currentAppId ||
+        isLibraryHomePage() ||
+        !(target instanceof HTMLElement) ||
+        !isLaunchActionElement(target)
+      ) {
+        return;
+      }
+
+      this.launchSuppressedUntil = Date.now() + launchSuppressionMs;
+      this.cleanupVideo(true);
+      this.status = rt("stoppedForLaunch");
+    }
 
     private queueScan() {
       if (this.scanQueued) {
@@ -2291,11 +2445,19 @@ function trailerHeroRuntimeFactory(nextSettings: TrailerHeroSettings, injectedTr
       window.setTimeout(() => {
         this.scanQueued = false;
         this.scan();
-      }, 250);
+      }, scanQueueDelayMs);
     }
 
     private async scan() {
-      if (!this.settings.enabled) {
+      if (!this.settings.enabled || document.hidden) {
+        return;
+      }
+
+      if (this.settings.stopOnLaunchEnabled && Date.now() < this.launchSuppressedUntil) {
+        if (this.currentVideo?.isConnected || this.currentFrame?.isConnected || this.pendingAppId) {
+          this.cleanupVideo(true);
+        }
+        this.status = rt("stoppedForLaunch");
         return;
       }
 
@@ -3367,6 +3529,10 @@ class TrailerHeroController {
     this.updateSettings({ logoAssistEnabled: enabled });
   }
 
+  setStopOnLaunch(enabled: boolean) {
+    this.updateSettings({ stopOnLaunchEnabled: enabled });
+  }
+
   toggleLowResCrt() {
     this.updateSettings({ crtLowResEnabled: !this.settings.crtLowResEnabled });
   }
@@ -3874,6 +4040,14 @@ function Content() {
         <div style={{ fontSize: "11px", opacity: 0.62, lineHeight: 1.32 }}>
           {tr("logoAssistHelp")}
         </div>
+      </PanelSectionRow>
+
+      <PanelSectionRow>
+        <ToggleField
+          label={tr("stopOnLaunch")}
+          checked={snapshot.settings.stopOnLaunchEnabled}
+          onChange={(checked) => controller.setStopOnLaunch(checked)}
+        />
       </PanelSectionRow>
 
       <PanelSectionRow>
