@@ -1210,7 +1210,7 @@ function isRuntimeSnapshot(value: unknown): value is RuntimeSnapshot {
 
 function trailerHeroRuntimeFactory(nextSettings: TrailerHeroSettings, injectedTranslations: TranslationTable): RuntimeSnapshot {
   const runtimeKey = "__trailerHeroRuntime";
-  const runtimeVersion = "0.1.6";
+  const runtimeVersion = "0.1.6.1";
   const styleId = "trailerhero-style";
   const videoClass = "trailerhero-video";
   const youtubeClass = "trailerhero-youtube";
@@ -1547,12 +1547,67 @@ function trailerHeroRuntimeFactory(nextSettings: TrailerHeroSettings, injectedTr
     return hasActionText && hasGamePageText;
   }
 
+  function hasLibraryHomeRoute(routeText: string): boolean {
+    return (
+      routeText.includes("/routes/library/home") ||
+      routeText.includes("/library/home") ||
+      routeText.includes("library_home") ||
+      routeText.includes("libraryhome")
+    );
+  }
+
+  function getHomeCapsuleLikeCount(): number {
+    return Array.from(
+      document.querySelectorAll<HTMLElement>(
+        "img[src*='/customimages/'], img[src*='library_capsule'], img[src*='header_image'], [style*='/customimages/'], [style*='library_capsule'], [style*='header_image']"
+      )
+    ).filter((element) => {
+      const rect = element.getBoundingClientRect();
+      return (
+        rect.width >= 90 &&
+        rect.height >= 90 &&
+        rect.top > window.innerHeight * 0.35 &&
+        rect.top < window.innerHeight * 0.95
+      );
+    }).length;
+  }
+
+  function hasLibraryHomeSignals(bodyText: string, routeText: string): boolean {
+    const hasHomeText = (
+      bodyText.includes("vedi altri giochi nella libreria") ||
+      bodyText.includes("see more games in your library") ||
+      bodyText.includes("recent games") ||
+      bodyText.includes("giochi recenti")
+    );
+    if (hasHomeText) {
+      return true;
+    }
+
+    const capsuleLikeCount = getHomeCapsuleLikeCount();
+    if (capsuleLikeCount < 3) {
+      return false;
+    }
+
+    const hasBigPictureChrome = /\b(menu|opzioni|options|seleziona|select|indietro|back)\b/.test(bodyText);
+    return hasLibraryHomeRoute(routeText) || hasBigPictureChrome;
+  }
+
   function isProbablyGameDetailsPage(): boolean {
     if (detectLocationAppId()) {
       return true;
     }
 
     const bodyText = document.body?.innerText?.slice(0, 7000).toLowerCase() ?? "";
+    const routeText = [
+      window.location.href,
+      window.location.pathname,
+      window.location.hash,
+      document.URL
+    ].join(" ").toLowerCase();
+    if (hasLibraryHomeSignals(bodyText, routeText)) {
+      return false;
+    }
+
     return hasGameDetailsSignals(bodyText);
   }
 
@@ -1619,49 +1674,15 @@ function trailerHeroRuntimeFactory(nextSettings: TrailerHeroSettings, injectedTr
     }
 
     const bodyText = document.body?.innerText?.slice(0, 9000).toLowerCase() ?? "";
+    if (hasLibraryHomeSignals(bodyText, routeText)) {
+      return true;
+    }
+
     if (hasGameDetailsSignals(bodyText)) {
       return false;
     }
 
-    if (
-      routeText.includes("/routes/library/home") ||
-      routeText.includes("/library/home") ||
-      routeText.includes("library_home") ||
-      routeText.includes("libraryhome")
-    ) {
-      return true;
-    }
-
-    const hasHomeText = (
-      bodyText.includes("vedi altri giochi nella libreria") ||
-      bodyText.includes("see more games in your library") ||
-      bodyText.includes("recent games") ||
-      bodyText.includes("giochi recenti")
-    );
-    if (hasHomeText) {
-      return true;
-    }
-
-    const hasBigPictureChrome = /\b(menu|opzioni|options|seleziona|select|indietro|back)\b/.test(bodyText);
-    if (!hasBigPictureChrome || !findHeroCandidate()) {
-      return false;
-    }
-
-    const capsuleLikeCount = Array.from(
-      document.querySelectorAll<HTMLElement>(
-        "img[src*='/customimages/'], img[src*='library_capsule'], img[src*='header_image'], [style*='/customimages/'], [style*='library_capsule'], [style*='header_image']"
-      )
-    ).filter((element) => {
-      const rect = element.getBoundingClientRect();
-      return (
-        rect.width >= 90 &&
-        rect.height >= 90 &&
-        rect.top > window.innerHeight * 0.35 &&
-        rect.top < window.innerHeight * 0.95
-      );
-    }).length;
-
-    return capsuleLikeCount >= 3;
+    return hasLibraryHomeRoute(routeText) && Boolean(findHeroCandidate());
   }
 
   function detectGameTitle(appId: number): string | undefined {
