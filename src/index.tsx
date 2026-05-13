@@ -1,5 +1,6 @@
 import {
   ButtonItem,
+  DropdownItem,
   PanelSection,
   PanelSectionRow,
   staticClasses,
@@ -32,13 +33,11 @@ type TrailerHeroSettings = {
   trimStartOverrides: Record<string, number>;
   trimEndOverrides: Record<string, number>;
   crtOverrides: Record<string, CrtPreference>;
-  youtubeQualityOverrides: Record<string, YouTubeQuality>;
   youtubeVideos: Record<string, string>;
 };
 
 type PreferredSource = "auto" | "steam" | "youtube";
 type CrtPreference = "auto" | "on" | "off";
-type YouTubeQuality = "auto" | "hd1080" | "hd720" | "large";
 
 type SteamMovieChoice = {
   id: string;
@@ -117,11 +116,11 @@ type Snapshot = {
 
 const SETTINGS_KEY = "trailerhero.settings.v1";
 const DEFAULT_SETTINGS: TrailerHeroSettings = {
-  settingsVersion: 3,
+  settingsVersion: 5,
   enabled: true,
-  delaySeconds: 8,
+  delaySeconds: 3,
   opacity: 0.92,
-  qualityHeight: 720,
+  qualityHeight: 2160,
   blockedApps: [],
   homeHeroEnabled: true,
   logoAssistEnabled: true,
@@ -135,18 +134,15 @@ const DEFAULT_SETTINGS: TrailerHeroSettings = {
   trimStartOverrides: {},
   trimEndOverrides: {},
   crtOverrides: {},
-  youtubeQualityOverrides: {},
   youtubeVideos: {}
 };
 
 const DEFAULT_TRIM_START_SECONDS = 4;
 const DEFAULT_TRIM_END_SECONDS = 5;
-const DELAY_OPTIONS = [3, 5, 8, 12, 20];
 const OPACITY_OPTIONS = [0.65, 0.8, 0.92, 1];
-const QUALITY_OPTIONS = [720, 1080, 480];
+const QUALITY_OPTIONS = [720, 1080, 2160];
 const SOURCE_OPTIONS: PreferredSource[] = ["auto", "steam", "youtube"];
 const CRT_OPTIONS: CrtPreference[] = ["auto", "on", "off"];
-const YOUTUBE_QUALITY_OPTIONS: YouTubeQuality[] = ["auto", "hd1080", "hd720", "large"];
 const BACKEND_TIMEOUT_MS = 18000;
 const RUNTIME_MISSING_SCRIPT = "window.__trailerHeroRuntime?.snapshot?.() ?? { status: 'TrailerHero runtime missing', runtimeMissing: true }";
 const FORCE_SCAN_SCRIPT = "window.__trailerHeroRuntime?.forceScan?.() ?? { status: 'TrailerHero runtime missing', runtimeMissing: true }";
@@ -201,13 +197,11 @@ function parseSettings(): TrailerHeroSettings {
     return {
       settingsVersion: DEFAULT_SETTINGS.settingsVersion,
       enabled: typeof parsed.enabled === "boolean" ? parsed.enabled : DEFAULT_SETTINGS.enabled,
-      delaySeconds: DELAY_OPTIONS.includes(parsed.delaySeconds ?? 0)
-        ? parsed.delaySeconds ?? DEFAULT_SETTINGS.delaySeconds
-        : DEFAULT_SETTINGS.delaySeconds,
+      delaySeconds: DEFAULT_SETTINGS.delaySeconds,
       opacity: OPACITY_OPTIONS.includes(parsed.opacity ?? 0)
         ? parsed.opacity ?? DEFAULT_SETTINGS.opacity
         : DEFAULT_SETTINGS.opacity,
-      qualityHeight: QUALITY_OPTIONS.includes(parsed.qualityHeight ?? 0)
+      qualityHeight: parsedVersion >= 4 && QUALITY_OPTIONS.includes(parsed.qualityHeight ?? 0)
         ? parsed.qualityHeight ?? DEFAULT_SETTINGS.qualityHeight
         : DEFAULT_SETTINGS.qualityHeight,
       blockedApps: Array.isArray(parsed.blockedApps)
@@ -225,12 +219,8 @@ function parseSettings(): TrailerHeroSettings {
       crtLowResEnabled: parsedVersion >= 2 && typeof parsed.crtLowResEnabled === "boolean"
         ? parsed.crtLowResEnabled
         : DEFAULT_SETTINGS.crtLowResEnabled,
-      youtubeEnabled: typeof parsed.youtubeEnabled === "boolean"
-        ? parsed.youtubeEnabled
-        : DEFAULT_SETTINGS.youtubeEnabled,
-      youtubeAutoSearch: typeof parsed.youtubeAutoSearch === "boolean"
-        ? parsed.youtubeAutoSearch
-        : DEFAULT_SETTINGS.youtubeAutoSearch,
+      youtubeEnabled: DEFAULT_SETTINGS.youtubeEnabled,
+      youtubeAutoSearch: DEFAULT_SETTINGS.youtubeAutoSearch,
       preferredSources: parsed.preferredSources && typeof parsed.preferredSources === "object"
         ? Object.fromEntries(
           Object.entries(parsed.preferredSources)
@@ -272,15 +262,6 @@ function parseSettings(): TrailerHeroSettings {
               (preference === "auto" || preference === "on" || preference === "off")
             ))
         ) as Record<string, CrtPreference>
-        : {},
-      youtubeQualityOverrides: parsed.youtubeQualityOverrides && typeof parsed.youtubeQualityOverrides === "object"
-        ? Object.fromEntries(
-          Object.entries(parsed.youtubeQualityOverrides)
-            .filter(([appid, quality]) => (
-              /^\d+$/.test(appid) &&
-              (quality === "auto" || quality === "hd1080" || quality === "hd720" || quality === "large")
-            ))
-        ) as Record<string, YouTubeQuality>
         : {},
       youtubeVideos: parsed.youtubeVideos && typeof parsed.youtubeVideos === "object"
         ? Object.fromEntries(
@@ -347,7 +328,7 @@ const TRANSLATIONS = {
     sourceSteam: "Steam",
     sourceYouTube: "YouTube",
     steamAppIdSource: "Steam AppID source",
-    steamQuality: "Steam quality: {quality}p",
+    steamQuality: "Quality: {quality}p",
     steamTrailer: "Steam trailer",
     steamTrailerAuto: "Automatic Steam video",
     steamTrailerNoPlayableId: "Trailer found, but without a playable id",
@@ -365,7 +346,7 @@ const TRANSLATIONS = {
     youtubeAutoNoTrailer: "YouTube auto: no trailer found",
     youtubeAutoSearch: "Auto YouTube search",
     youtubeFallback: "YouTube fallback",
-    youtubeForGame: "YouTube for this game",
+    youtubeForGame: "Custom YouTube link",
     youtubeSearchError: "YouTube search error",
     youtubeTrailer: "YouTube trailer",
     youtubeTrailerActive: "YouTube trailer active",
@@ -419,7 +400,7 @@ const TRANSLATIONS = {
     sourceSteam: "Steam",
     sourceYouTube: "YouTube",
     steamAppIdSource: "Steam AppID sorgente",
-    steamQuality: "Qualita Steam: {quality}p",
+    steamQuality: "Qualità: {quality}p",
     steamTrailer: "Steam trailer",
     steamTrailerAuto: "Video Steam automatico",
     steamTrailerNoPlayableId: "Trailer trovato, ma senza id riproducibile",
@@ -437,7 +418,7 @@ const TRANSLATIONS = {
     youtubeAutoNoTrailer: "YouTube auto: nessun trailer trovato",
     youtubeAutoSearch: "Ricerca YouTube auto",
     youtubeFallback: "YouTube fallback",
-    youtubeForGame: "YouTube per questo gioco",
+    youtubeForGame: "Link YouTube personalizzato",
     youtubeSearchError: "Errore ricerca YouTube",
     youtubeTrailer: "YouTube trailer",
     youtubeTrailerActive: "Trailer YouTube attivo",
@@ -491,7 +472,7 @@ const TRANSLATIONS = {
     sourceSteam: "Steam",
     sourceYouTube: "YouTube",
     steamAppIdSource: "Steam AppID source",
-    steamQuality: "Qualité Steam : {quality}p",
+    steamQuality: "Qualité : {quality}p",
     steamTrailer: "Trailer Steam",
     steamTrailerAuto: "Vidéo Steam automatique",
     steamTrailerNoPlayableId: "Trailer trouvé, mais sans id lisible",
@@ -509,7 +490,7 @@ const TRANSLATIONS = {
     youtubeAutoNoTrailer: "YouTube auto : aucun trailer trouvé",
     youtubeAutoSearch: "Recherche YouTube auto",
     youtubeFallback: "Fallback YouTube",
-    youtubeForGame: "YouTube pour ce jeu",
+    youtubeForGame: "Lien YouTube personnalisé",
     youtubeSearchError: "Erreur de recherche YouTube",
     youtubeTrailer: "Trailer YouTube",
     youtubeTrailerActive: "Trailer YouTube actif",
@@ -563,7 +544,7 @@ const TRANSLATIONS = {
     sourceSteam: "Steam",
     sourceYouTube: "YouTube",
     steamAppIdSource: "Steam AppID fuente",
-    steamQuality: "Calidad Steam: {quality}p",
+    steamQuality: "Calidad: {quality}p",
     steamTrailer: "Tráiler de Steam",
     steamTrailerAuto: "Vídeo Steam automático",
     steamTrailerNoPlayableId: "Tráiler encontrado, pero sin id reproducible",
@@ -581,7 +562,7 @@ const TRANSLATIONS = {
     youtubeAutoNoTrailer: "YouTube auto: no se encontró tráiler",
     youtubeAutoSearch: "Búsqueda YouTube auto",
     youtubeFallback: "Fallback YouTube",
-    youtubeForGame: "YouTube para este juego",
+    youtubeForGame: "Enlace de YouTube personalizado",
     youtubeSearchError: "Error de búsqueda en YouTube",
     youtubeTrailer: "Tráiler de YouTube",
     youtubeTrailerActive: "Tráiler YouTube activo",
@@ -635,7 +616,7 @@ const TRANSLATIONS = {
     sourceSteam: "Steam",
     sourceYouTube: "YouTube",
     steamAppIdSource: "Steam AppID fonte",
-    steamQuality: "Qualidade Steam: {quality}p",
+    steamQuality: "Qualidade: {quality}p",
     steamTrailer: "Trailer Steam",
     steamTrailerAuto: "Vídeo Steam automático",
     steamTrailerNoPlayableId: "Trailer encontrado, mas sem id reproduzível",
@@ -653,7 +634,7 @@ const TRANSLATIONS = {
     youtubeAutoNoTrailer: "YouTube auto: nenhum trailer encontrado",
     youtubeAutoSearch: "Pesquisa YouTube auto",
     youtubeFallback: "Fallback YouTube",
-    youtubeForGame: "YouTube para este jogo",
+    youtubeForGame: "Link YouTube personalizado",
     youtubeSearchError: "Erro na pesquisa do YouTube",
     youtubeTrailer: "Trailer YouTube",
     youtubeTrailerActive: "Trailer YouTube ativo",
@@ -707,7 +688,7 @@ const TRANSLATIONS = {
     sourceSteam: "Steam",
     sourceYouTube: "YouTube",
     steamAppIdSource: "Steam AppID fonte",
-    steamQuality: "Qualidade Steam: {quality}p",
+    steamQuality: "Qualidade: {quality}p",
     steamTrailer: "Trailer Steam",
     steamTrailerAuto: "Vídeo Steam automático",
     steamTrailerNoPlayableId: "Trailer encontrado, mas sem id reproduzível",
@@ -725,7 +706,7 @@ const TRANSLATIONS = {
     youtubeAutoNoTrailer: "YouTube auto: nenhum trailer encontrado",
     youtubeAutoSearch: "Busca YouTube auto",
     youtubeFallback: "Fallback YouTube",
-    youtubeForGame: "YouTube para este jogo",
+    youtubeForGame: "Link YouTube personalizado",
     youtubeSearchError: "Erro na busca do YouTube",
     youtubeTrailer: "Trailer YouTube",
     youtubeTrailerActive: "Trailer YouTube ativo",
@@ -779,7 +760,7 @@ const TRANSLATIONS = {
     sourceSteam: "Steam",
     sourceYouTube: "YouTube",
     steamAppIdSource: "Steam AppID Quelle",
-    steamQuality: "Steam-Qualität: {quality}p",
+    steamQuality: "Qualität: {quality}p",
     steamTrailer: "Steam-Trailer",
     steamTrailerAuto: "Automatisches Steam-Video",
     steamTrailerNoPlayableId: "Trailer gefunden, aber ohne abspielbare ID",
@@ -797,7 +778,7 @@ const TRANSLATIONS = {
     youtubeAutoNoTrailer: "YouTube Auto: kein Trailer gefunden",
     youtubeAutoSearch: "Automatische YouTube-Suche",
     youtubeFallback: "YouTube-Fallback",
-    youtubeForGame: "YouTube für dieses Spiel",
+    youtubeForGame: "Eigener YouTube-Link",
     youtubeSearchError: "Fehler bei der YouTube-Suche",
     youtubeTrailer: "YouTube-Trailer",
     youtubeTrailerActive: "YouTube-Trailer aktiv",
@@ -851,7 +832,7 @@ const TRANSLATIONS = {
     sourceSteam: "Steam",
     sourceYouTube: "YouTube",
     steamAppIdSource: "Steam AppID bron",
-    steamQuality: "Steam-kwaliteit: {quality}p",
+    steamQuality: "Kwaliteit: {quality}p",
     steamTrailer: "Steam-trailer",
     steamTrailerAuto: "Automatische Steam-video",
     steamTrailerNoPlayableId: "Trailer gevonden, maar zonder afspeelbare id",
@@ -869,7 +850,7 @@ const TRANSLATIONS = {
     youtubeAutoNoTrailer: "YouTube auto: geen trailer gevonden",
     youtubeAutoSearch: "Automatisch YouTube zoeken",
     youtubeFallback: "YouTube fallback",
-    youtubeForGame: "YouTube voor deze game",
+    youtubeForGame: "Aangepaste YouTube-link",
     youtubeSearchError: "YouTube-zoekfout",
     youtubeTrailer: "YouTube-trailer",
     youtubeTrailerActive: "YouTube-trailer actief",
@@ -923,7 +904,7 @@ const TRANSLATIONS = {
     sourceSteam: "Steam",
     sourceYouTube: "YouTube",
     steamAppIdSource: "Джерело Steam AppID",
-    steamQuality: "Якість Steam: {quality}p",
+    steamQuality: "Якість: {quality}p",
     steamTrailer: "Трейлер Steam",
     steamTrailerAuto: "Автоматичне відео Steam",
     steamTrailerNoPlayableId: "Трейлер знайдено, але без відтворюваного id",
@@ -941,7 +922,7 @@ const TRANSLATIONS = {
     youtubeAutoNoTrailer: "YouTube auto: трейлер не знайдено",
     youtubeAutoSearch: "Автопошук YouTube",
     youtubeFallback: "Резерв YouTube",
-    youtubeForGame: "YouTube для цієї гри",
+    youtubeForGame: "Власне посилання YouTube",
     youtubeSearchError: "Помилка пошуку YouTube",
     youtubeTrailer: "Трейлер YouTube",
     youtubeTrailerActive: "Трейлер YouTube активний",
@@ -995,7 +976,7 @@ const TRANSLATIONS = {
     sourceSteam: "Steam",
     sourceYouTube: "YouTube",
     steamAppIdSource: "Steam AppID 来源",
-    steamQuality: "Steam 质量：{quality}p",
+    steamQuality: "质量：{quality}p",
     steamTrailer: "Steam 预告片",
     steamTrailerAuto: "自动 Steam 视频",
     steamTrailerNoPlayableId: "找到了预告片，但没有可播放 id",
@@ -1013,7 +994,7 @@ const TRANSLATIONS = {
     youtubeAutoNoTrailer: "YouTube 自动：未找到预告片",
     youtubeAutoSearch: "自动搜索 YouTube",
     youtubeFallback: "YouTube 备用",
-    youtubeForGame: "此游戏的 YouTube",
+    youtubeForGame: "自定义 YouTube 链接",
     youtubeSearchError: "YouTube 搜索错误",
     youtubeTrailer: "YouTube 预告片",
     youtubeTrailerActive: "YouTube 预告片已启用",
@@ -1067,7 +1048,7 @@ const TRANSLATIONS = {
     sourceSteam: "Steam",
     sourceYouTube: "YouTube",
     steamAppIdSource: "Steam AppID ソース",
-    steamQuality: "Steam 品質: {quality}p",
+    steamQuality: "品質: {quality}p",
     steamTrailer: "Steam トレーラー",
     steamTrailerAuto: "自動 Steam 動画",
     steamTrailerNoPlayableId: "トレーラーは見つかりましたが再生可能な id がありません",
@@ -1085,7 +1066,7 @@ const TRANSLATIONS = {
     youtubeAutoNoTrailer: "YouTube 自動: トレーラーが見つかりません",
     youtubeAutoSearch: "YouTube 自動検索",
     youtubeFallback: "YouTube フォールバック",
-    youtubeForGame: "このゲームの YouTube",
+    youtubeForGame: "カスタム YouTube リンク",
     youtubeSearchError: "YouTube 検索エラー",
     youtubeTrailer: "YouTube トレーラー",
     youtubeTrailerActive: "YouTube トレーラー有効",
@@ -1191,19 +1172,6 @@ function getCrtPreferenceLabel(preference: CrtPreference): string {
   return tr("auto");
 }
 
-function getYouTubeQualityLabel(quality: YouTubeQuality): string {
-  if (quality === "hd1080") {
-    return "1080p";
-  }
-  if (quality === "hd720") {
-    return "720p";
-  }
-  if (quality === "large") {
-    return "480p";
-  }
-  return tr("auto");
-}
-
 function getSourceLabel(source: PreferredSource | undefined): string {
   if (source === "steam") {
     return tr("sourceSteam");
@@ -1242,7 +1210,7 @@ function isRuntimeSnapshot(value: unknown): value is RuntimeSnapshot {
 
 function trailerHeroRuntimeFactory(nextSettings: TrailerHeroSettings, injectedTranslations: TranslationTable): RuntimeSnapshot {
   const runtimeKey = "__trailerHeroRuntime";
-  const runtimeVersion = "0.1.4";
+  const runtimeVersion = "0.1.6";
   const styleId = "trailerhero-style";
   const videoClass = "trailerhero-video";
   const youtubeClass = "trailerhero-youtube";
@@ -1570,20 +1538,22 @@ function trailerHeroRuntimeFactory(nextSettings: TrailerHeroSettings, injectedTr
     return undefined;
   }
 
+  function hasGameDetailsSignals(bodyText: string): boolean {
+    const hasActionText = /\b(play|install|resume|update|gioca|avvia|installa|riprendi|aggiorna)\b/.test(bodyText);
+    const hasGamePageText = (
+      /\b(achievements|achievement|activity|dlc|community|controller|library|cloud)\b/.test(bodyText) ||
+      /\b(obiettivi|attivit|collezione|ultimo avvio|tempo di gioco|informazioni sul gioco|amici)\b/.test(bodyText)
+    );
+    return hasActionText && hasGamePageText;
+  }
+
   function isProbablyGameDetailsPage(): boolean {
     if (detectLocationAppId()) {
       return true;
     }
 
-    if (isLibraryHomePage()) {
-      return true;
-    }
-
     const bodyText = document.body?.innerText?.slice(0, 7000).toLowerCase() ?? "";
-    const hasActionText = /\b(play|install|resume|update|gioca|avvia|installa|riprendi|aggiorna)\b/.test(bodyText);
-    const hasGamePageText = /\b(achievements|activity|dlc|community|obiettivi|attivit|collezione|controller)\b/.test(bodyText);
-
-    return hasActionText && hasGamePageText;
+    return hasGameDetailsSignals(bodyText);
   }
 
   function normalizeActionText(value: string): string {
@@ -1644,6 +1614,15 @@ function trailerHeroRuntimeFactory(nextSettings: TrailerHeroSettings, injectedTr
       document.URL
     ].join(" ").toLowerCase();
 
+    if (detectLocationAppId()) {
+      return false;
+    }
+
+    const bodyText = document.body?.innerText?.slice(0, 9000).toLowerCase() ?? "";
+    if (hasGameDetailsSignals(bodyText)) {
+      return false;
+    }
+
     if (
       routeText.includes("/routes/library/home") ||
       routeText.includes("/library/home") ||
@@ -1651,17 +1630,6 @@ function trailerHeroRuntimeFactory(nextSettings: TrailerHeroSettings, injectedTr
       routeText.includes("libraryhome")
     ) {
       return true;
-    }
-
-    if (detectLocationAppId()) {
-      return false;
-    }
-
-    const bodyText = document.body?.innerText?.slice(0, 9000).toLowerCase() ?? "";
-    const looksLikeGameDetails = /\b(play|install|resume|update|gioca|avvia|installa|riprendi|aggiorna)\b/.test(bodyText) &&
-      /\b(achievements|activity|dlc|community|obiettivi|attivit|controller)\b/.test(bodyText);
-    if (looksLikeGameDetails) {
-      return false;
     }
 
     const hasHomeText = (
@@ -2310,7 +2278,6 @@ function trailerHeroRuntimeFactory(nextSettings: TrailerHeroSettings, injectedTr
         JSON.stringify(previousSettings.trimStartOverrides) !== JSON.stringify(settings.trimStartOverrides) ||
         JSON.stringify(previousSettings.trimEndOverrides) !== JSON.stringify(settings.trimEndOverrides) ||
         JSON.stringify(previousSettings.crtOverrides) !== JSON.stringify(settings.crtOverrides) ||
-        JSON.stringify(previousSettings.youtubeQualityOverrides) !== JSON.stringify(settings.youtubeQualityOverrides) ||
         JSON.stringify(previousSettings.youtubeVideos) !== JSON.stringify(settings.youtubeVideos)
       ) {
         this.trailerCache.clear();
@@ -2461,7 +2428,8 @@ function trailerHeroRuntimeFactory(nextSettings: TrailerHeroSettings, injectedTr
         return;
       }
 
-      const isHome = isLibraryHomePage();
+      const isGameDetails = isProbablyGameDetailsPage();
+      const isHome = isLibraryHomePage() && !isGameDetails;
       if (isHome && !this.settings.homeHeroEnabled) {
         this.currentAppId = undefined;
         this.currentSourceAppId = undefined;
@@ -2476,7 +2444,7 @@ function trailerHeroRuntimeFactory(nextSettings: TrailerHeroSettings, injectedTr
         return;
       }
 
-      if (!document.body || !isProbablyGameDetailsPage()) {
+      if (!document.body || (!isHome && !isGameDetails)) {
         this.currentAppId = undefined;
         this.currentSourceAppId = undefined;
         this.currentTrailerName = undefined;
@@ -2625,8 +2593,14 @@ function trailerHeroRuntimeFactory(nextSettings: TrailerHeroSettings, injectedTr
       return this.settings.crtLowResEnabled && automaticMatch;
     }
 
-    private getYouTubeQuality(appId: number): YouTubeQuality {
-      return this.settings.youtubeQualityOverrides[String(appId)] ?? "auto";
+    private getYouTubeQuality(): string {
+      if (this.settings.qualityHeight >= 2160) {
+        return "highres";
+      }
+      if (this.settings.qualityHeight >= 1080) {
+        return "hd1080";
+      }
+      return "hd720";
     }
 
     private getYouTubeId(appId: number): string | undefined {
@@ -2705,12 +2679,25 @@ function trailerHeroRuntimeFactory(nextSettings: TrailerHeroSettings, injectedTr
 
         const sharedBase = `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${movieId}`;
         const cdnBase = `https://cdn.akamai.steamstatic.com/steam/apps/${movieId}`;
-        const candidates = [
-          `${sharedBase}/movie480.mp4`,
-          `${sharedBase}/movie_max.mp4`,
-          `${cdnBase}/movie480.mp4`,
-          `${cdnBase}/movie_max.mp4`
+        const directMovieFiles = [
+          "movie2160.mp4",
+          "movie1440.mp4",
+          "movie1080.mp4",
+          "movie720.mp4",
+          "movie_max.mp4",
+          "movie480.mp4"
         ];
+        const candidates = [
+          ...directMovieFiles.map((file) => `${sharedBase}/${file}`),
+          ...directMovieFiles.map((file) => `${cdnBase}/${file}`)
+        ];
+
+        if (movie.dash_h264) {
+          candidates.push(movie.dash_h264);
+        }
+        if (movie.dash_av1) {
+          candidates.push(movie.dash_av1);
+        }
 
         if (movie.hls_h264) {
           candidates.push(movie.hls_h264);
@@ -2733,14 +2720,17 @@ function trailerHeroRuntimeFactory(nextSettings: TrailerHeroSettings, injectedTr
     private orderCandidates(candidates: string[]): string[] {
       const score = (url: string) => {
         const isHls = url.includes(".m3u8");
+        const isDash = url.includes(".mpd");
         const isMax = url.includes("movie_max");
         const is480 = url.includes("movie480");
+        const explicitHeight = Number(url.match(/movie(\d{3,4})/i)?.[1] ?? 0);
+        const height = explicitHeight || (isMax ? 1080 : this.settings.qualityHeight);
 
         if (this.settings.qualityHeight <= 480) {
           if (is480) {
             return 0;
           }
-          if (isHls) {
+          if (isDash || isHls) {
             return 1;
           }
           if (isMax) {
@@ -2749,16 +2739,13 @@ function trailerHeroRuntimeFactory(nextSettings: TrailerHeroSettings, injectedTr
           return 3;
         }
 
-        if (isHls) {
-          return 0;
-        }
-        if (isMax) {
-          return 1;
-        }
         if (is480) {
-          return 2;
+          return 10000;
         }
-        return 3;
+        const distance = Math.abs(height - this.settings.qualityHeight);
+        const exactOrHigherBias = height >= this.settings.qualityHeight ? -0.25 : 0;
+        const adaptivePenalty = isDash ? 0.35 : isHls ? 0.45 : 0;
+        return distance + adaptivePenalty + exactOrHigherBias;
       };
 
       return [...candidates].sort((left, right) => score(left) - score(right));
@@ -2807,6 +2794,14 @@ function trailerHeroRuntimeFactory(nextSettings: TrailerHeroSettings, injectedTr
         if (!source) {
           this.cleanupVideo();
           this.status = rt("steamTrailerNotPlayable");
+          return;
+        }
+
+        if (source.includes(".mpd")) {
+          this.playDash(video, source, token).catch(() => {
+            candidateIndex += 1;
+            tryCandidate();
+          });
           return;
         }
 
@@ -2868,7 +2863,7 @@ function trailerHeroRuntimeFactory(nextSettings: TrailerHeroSettings, injectedTr
       this.ensureYouTubePreconnect();
       const host = this.prepareHost(target);
       const frame = document.createElement("iframe");
-      const youtubeQuality = this.getYouTubeQuality(appId);
+      const youtubeQuality = this.getYouTubeQuality();
       const params = new URLSearchParams({
         autoplay: "1",
         autohide: "1",
@@ -2886,9 +2881,7 @@ function trailerHeroRuntimeFactory(nextSettings: TrailerHeroSettings, injectedTr
         iv_load_policy: "3",
         origin: window.location.origin
       });
-      if (youtubeQuality !== "auto") {
-        params.set("vq", youtubeQuality);
-      }
+      params.set("vq", youtubeQuality);
 
       frame.className = `${videoClass} ${youtubeClass}`;
       frame.src = `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
@@ -2907,7 +2900,7 @@ function trailerHeroRuntimeFactory(nextSettings: TrailerHeroSettings, injectedTr
         this.fadeTimer = setTimeout(() => {
           if (token === this.requestToken && frame.isConnected) {
             this.hideDuplicateHomeHeroCopies(appId);
-            const shouldApplyCrt = this.shouldApplyCrt(appId, youtubeQuality === "large");
+            const shouldApplyCrt = this.shouldApplyCrt(appId, false);
             host.classList.toggle(crtClass, shouldApplyCrt);
             frame.classList.toggle(crtClass, shouldApplyCrt);
             this.moveSteamLogoForTrailer(appId, token);
@@ -3259,6 +3252,60 @@ function trailerHeroRuntimeFactory(nextSettings: TrailerHeroSettings, injectedTr
       });
     }
 
+    private async playDash(video: HTMLVideoElement, manifestUrl: string, token: number) {
+      if (typeof MediaSource === "undefined") {
+        throw new Error(rt("mediaSourceUnavailable"));
+      }
+
+      const manifestText = await this.fetchText(manifestUrl);
+      const variant = this.selectDashVariant(manifestText, manifestUrl);
+      video.dataset.trailerheroLowResHint = variant.height > 0 && variant.height <= 540 ? "1" : "";
+      const mimeType = `video/mp4; codecs="${variant.codec}"`;
+
+      if (!MediaSource.isTypeSupported(mimeType)) {
+        throw new Error(`Codec non supportato: ${mimeType}`);
+      }
+
+      await new Promise<void>((resolve, reject) => {
+        const mediaSource = new MediaSource();
+        const objectUrl = URL.createObjectURL(mediaSource);
+        video.dataset.trailerheroObjectUrl = objectUrl;
+        video.src = objectUrl;
+        video.load();
+
+        const fail = (error: unknown) => {
+          URL.revokeObjectURL(objectUrl);
+          reject(error);
+        };
+
+        mediaSource.addEventListener("sourceopen", async () => {
+          try {
+            if (token !== this.requestToken) {
+              throw new Error("Trailer request changed");
+            }
+
+            const sourceBuffer = mediaSource.addSourceBuffer(mimeType);
+            sourceBuffer.mode = "segments";
+            await this.appendBuffer(sourceBuffer, await this.fetchArrayBuffer(variant.initUrl));
+
+            for (const segmentUrl of variant.segmentUrls) {
+              if (token !== this.requestToken) {
+                throw new Error("Trailer request changed");
+              }
+              await this.appendBuffer(sourceBuffer, await this.fetchArrayBuffer(segmentUrl));
+            }
+
+            if (mediaSource.readyState === "open") {
+              mediaSource.endOfStream();
+            }
+            resolve();
+          } catch (error) {
+            fail(error);
+          }
+        }, { once: true });
+      });
+    }
+
     private async fetchText(url: string): Promise<string> {
       const response = await fetch(url);
       if (!response.ok) {
@@ -3339,6 +3386,172 @@ function trailerHeroRuntimeFactory(nextSettings: TrailerHeroSettings, injectedTr
       });
 
       return variants[0];
+    }
+
+    private selectDashVariant(
+      manifestText: string,
+      manifestUrl: string
+    ): { initUrl: string; segmentUrls: string[]; codec: string; height: number; bandwidth: number } {
+      const documentXml = new DOMParser().parseFromString(manifestText, "application/xml");
+      if (documentXml.querySelector("parsererror")) {
+        throw new Error("Manifest DASH non valido");
+      }
+
+      const durationSeconds = this.parseIsoDurationSeconds(
+        documentXml.documentElement.getAttribute("mediaPresentationDuration") ?? ""
+      );
+      const variants: Array<{
+        initUrl: string;
+        segmentUrls: string[];
+        codec: string;
+        height: number;
+        bandwidth: number;
+      }> = [];
+
+      for (const adaptation of Array.from(documentXml.getElementsByTagName("AdaptationSet"))) {
+        const contentType = adaptation.getAttribute("contentType") ?? "";
+        const mimeType = adaptation.getAttribute("mimeType") ?? "";
+        if (contentType && contentType !== "video") {
+          continue;
+        }
+        if (mimeType && !mimeType.startsWith("video/")) {
+          continue;
+        }
+
+        const adaptationTemplate = adaptation.getElementsByTagName("SegmentTemplate")[0];
+        for (const representation of Array.from(adaptation.getElementsByTagName("Representation"))) {
+          const codec = representation.getAttribute("codecs") ?? adaptation.getAttribute("codecs") ?? "";
+          const representationMime = representation.getAttribute("mimeType") ?? mimeType;
+          if (!codec || (representationMime && !representationMime.startsWith("video/"))) {
+            continue;
+          }
+
+          const template = representation.getElementsByTagName("SegmentTemplate")[0] ?? adaptationTemplate;
+          if (!template) {
+            continue;
+          }
+
+          const representationId = representation.getAttribute("id") ?? "";
+          const bandwidth = Number(representation.getAttribute("bandwidth") ?? 0);
+          const height = Number(representation.getAttribute("height") ?? adaptation.getAttribute("maxHeight") ?? 0);
+          const initialization = template.getAttribute("initialization") ?? "";
+          const media = template.getAttribute("media") ?? "";
+          if (!representationId || !initialization || !media) {
+            continue;
+          }
+
+          const initUrl = new URL(
+            this.expandDashTemplate(initialization, representationId, bandwidth),
+            manifestUrl
+          ).href;
+          const segmentUrls = this.buildDashSegmentUrls(template, media, representationId, bandwidth, durationSeconds, manifestUrl);
+          if (!segmentUrls.length) {
+            continue;
+          }
+
+          variants.push({
+            initUrl,
+            segmentUrls,
+            codec,
+            height,
+            bandwidth
+          });
+        }
+      }
+
+      if (!variants.length) {
+        throw new Error("Manifest DASH senza varianti video");
+      }
+
+      variants.sort((left, right) => {
+        const targetHeight = this.settings.qualityHeight;
+        const leftDistance = Math.abs((left.height || targetHeight) - targetHeight);
+        const rightDistance = Math.abs((right.height || targetHeight) - targetHeight);
+        return leftDistance - rightDistance || right.height - left.height || right.bandwidth - left.bandwidth;
+      });
+
+      return variants[0];
+    }
+
+    private buildDashSegmentUrls(
+      template: Element,
+      mediaTemplate: string,
+      representationId: string,
+      bandwidth: number,
+      durationSeconds: number,
+      manifestUrl: string
+    ): string[] {
+      const timeline = template.getElementsByTagName("SegmentTimeline")[0];
+      const startNumber = Number(template.getAttribute("startNumber") ?? 1);
+      const urls: string[] = [];
+      const maxSegments = 180;
+
+      if (timeline) {
+        let number = startNumber;
+        let currentTime = 0;
+        for (const item of Array.from(timeline.getElementsByTagName("S"))) {
+          const duration = Number(item.getAttribute("d") ?? 0);
+          const repeat = Number(item.getAttribute("r") ?? 0);
+          if (!duration) {
+            continue;
+          }
+          if (item.hasAttribute("t")) {
+            currentTime = Number(item.getAttribute("t") ?? currentTime);
+          }
+          const count = repeat < 0 ? maxSegments - urls.length : repeat + 1;
+          for (let index = 0; index < count && urls.length < maxSegments; index += 1) {
+            const expanded = this.expandDashTemplate(mediaTemplate, representationId, bandwidth, number, currentTime);
+            urls.push(new URL(expanded, manifestUrl).href);
+            number += 1;
+            currentTime += duration;
+          }
+        }
+        return urls;
+      }
+
+      const timescale = Number(template.getAttribute("timescale") ?? 1);
+      const duration = Number(template.getAttribute("duration") ?? 0);
+      if (!timescale || !duration || !durationSeconds) {
+        return [];
+      }
+
+      const segmentCount = Math.min(maxSegments, Math.ceil(durationSeconds / (duration / timescale)));
+      for (let index = 0; index < segmentCount; index += 1) {
+        const number = startNumber + index;
+        const expanded = this.expandDashTemplate(mediaTemplate, representationId, bandwidth, number);
+        urls.push(new URL(expanded, manifestUrl).href);
+      }
+      return urls;
+    }
+
+    private expandDashTemplate(
+      value: string,
+      representationId: string,
+      bandwidth: number,
+      number?: number,
+      time?: number
+    ): string {
+      return value
+        .replace(/\$RepresentationID\$/g, representationId)
+        .replace(/\$Bandwidth\$/g, String(bandwidth))
+        .replace(/\$Time\$/g, String(time ?? 0))
+        .replace(/\$Number(?:%0(\d+)d)?\$/g, (_match, width: string | undefined) => {
+          const text = String(number ?? 0);
+          return width ? text.padStart(Number(width), "0") : text;
+        })
+        .replace(/\$\$/g, "$");
+    }
+
+    private parseIsoDurationSeconds(value: string): number {
+      const match = value.match(/^P(?:(\d+(?:\.\d+)?)D)?(?:T(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?)?$/);
+      if (!match) {
+        return 0;
+      }
+      const days = Number(match[1] ?? 0);
+      const hours = Number(match[2] ?? 0);
+      const minutes = Number(match[3] ?? 0);
+      const seconds = Number(match[4] ?? 0);
+      return days * 86400 + hours * 3600 + minutes * 60 + seconds;
     }
 
     private parseHlsMediaPlaylist(mediaText: string, mediaUrl: string): { initUrl: string; segmentUrls: string[] } {
@@ -3501,10 +3714,6 @@ class TrailerHeroController {
     this.updateSettings({ enabled });
   }
 
-  cycleDelay() {
-    this.updateSettings({ delaySeconds: getNextOption(DELAY_OPTIONS, this.settings.delaySeconds) });
-  }
-
   cycleOpacity() {
     this.updateSettings({ opacity: getNextOption(OPACITY_OPTIONS, this.settings.opacity) });
   }
@@ -3571,22 +3780,6 @@ class TrailerHeroController {
 
   setYouTubeAutoSearch(enabled: boolean) {
     this.updateSettings({ youtubeAutoSearch: enabled });
-  }
-
-  cycleYouTubeQualityForCurrent() {
-    if (!this.appId) {
-      return;
-    }
-
-    const key = String(this.appId);
-    const nextQuality = getNextOption(YOUTUBE_QUALITY_OPTIONS, this.settings.youtubeQualityOverrides[key] ?? "auto");
-    const youtubeQualityOverrides = { ...this.settings.youtubeQualityOverrides };
-    if (nextQuality === "auto") {
-      delete youtubeQualityOverrides[key];
-    } else {
-      youtubeQualityOverrides[key] = nextQuality;
-    }
-    this.updateSettings({ youtubeQualityOverrides });
   }
 
   cyclePreferredSource() {
@@ -3966,7 +4159,6 @@ const controller = new TrailerHeroController();
 function Content() {
   const [snapshot, setSnapshot] = useState<Snapshot>(controller.getSnapshot());
   const [youtubeInput, setYoutubeInput] = useState("");
-  const [steamAppInput, setSteamAppInput] = useState("");
   const [trimStartInput, setTrimStartInput] = useState(String(DEFAULT_TRIM_START_SECONDS));
   const [trimEndInput, setTrimEndInput] = useState(String(DEFAULT_TRIM_END_SECONDS));
 
@@ -3974,9 +4166,6 @@ function Content() {
   useEffect(() => {
     setYoutubeInput(snapshot.appId ? snapshot.settings.youtubeVideos[String(snapshot.appId)] ?? "" : "");
   }, [snapshot.appId, snapshot.settings.youtubeVideos]);
-  useEffect(() => {
-    setSteamAppInput(snapshot.appId ? String(snapshot.settings.steamAppOverrides[String(snapshot.appId)] ?? "") : "");
-  }, [snapshot.appId, snapshot.settings.steamAppOverrides]);
   useEffect(() => {
     setTrimStartInput(String(snapshot.trimStartSeconds ?? DEFAULT_TRIM_START_SECONDS));
     setTrimEndInput(String(snapshot.trimEndSeconds ?? DEFAULT_TRIM_END_SECONDS));
@@ -3989,36 +4178,15 @@ function Content() {
   const currentCrtPreference = snapshot.appId
     ? snapshot.settings.crtOverrides[String(snapshot.appId)] ?? "auto"
     : "auto";
-  const currentYouTubeQuality = snapshot.appId
-    ? snapshot.settings.youtubeQualityOverrides[String(snapshot.appId)] ?? "auto"
-    : "auto";
 
   return (
     <PanelSection title={tr("title")}>
-      <PanelSectionRow>
-        <div style={{ fontSize: "12px", opacity: 0.82, lineHeight: 1.35 }}>
-          {snapshot.status}
-        </div>
-      </PanelSectionRow>
-
       <PanelSectionRow>
         <ToggleField
           label={tr("active")}
           checked={snapshot.settings.enabled}
           onChange={(checked) => controller.setEnabled(checked)}
         />
-      </PanelSectionRow>
-
-      <PanelSectionRow>
-        <ButtonItem layout="below" onClick={() => controller.cycleDelay()}>
-          {tr("delay", { seconds: snapshot.settings.delaySeconds })}
-        </ButtonItem>
-      </PanelSectionRow>
-
-      <PanelSectionRow>
-        <ButtonItem layout="below" onClick={() => controller.cycleQuality()}>
-          {tr("steamQuality", { quality: snapshot.settings.qualityHeight })}
-        </ButtonItem>
       </PanelSectionRow>
 
       <PanelSectionRow>
@@ -4069,34 +4237,27 @@ function Content() {
       ) : null}
 
       <PanelSectionRow>
-        <ToggleField
-          label={tr("youtubeFallback")}
-          checked={snapshot.settings.youtubeEnabled}
-          onChange={(checked) => controller.setYouTubeEnabled(checked)}
-        />
-      </PanelSectionRow>
-
-      <PanelSectionRow>
-        <ToggleField
-          label={tr("youtubeAutoSearch")}
-          checked={snapshot.settings.youtubeAutoSearch}
-          onChange={(checked) => controller.setYouTubeAutoSearch(checked)}
-        />
+        <div style={{ fontSize: "12px", opacity: 0.82, lineHeight: 1.35 }}>
+          {snapshot.status}
+        </div>
       </PanelSectionRow>
 
       {snapshot.appId ? (
         <>
-          {snapshot.gameTitle ? (
-            <PanelSectionRow>
-              <div style={{ fontSize: "12px", opacity: 0.72, lineHeight: 1.35 }}>
-                {tr("game", { title: snapshot.gameTitle })}
-                {snapshot.sourceAppId && snapshot.sourceAppId !== snapshot.appId ? ` / Steam ${snapshot.sourceAppId}` : ""}
-              </div>
-            </PanelSectionRow>
-          ) : null}
           <PanelSectionRow>
             <ButtonItem layout="below" onClick={() => controller.cyclePreferredSource()}>
               {tr("source", { value: getSourceLabel(snapshot.preferredSource) })}
+            </ButtonItem>
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <ButtonItem
+              layout="below"
+              onClick={() => {
+                controller.cycleQuality();
+                controller.refresh();
+              }}
+            >
+              {tr("steamQuality", { quality: snapshot.settings.qualityHeight })}
             </ButtonItem>
           </PanelSectionRow>
           <PanelSectionRow>
@@ -4110,89 +4271,6 @@ function Content() {
               {tr("crtGame", { value: getCrtPreferenceLabel(currentCrtPreference) })}
             </ButtonItem>
           </PanelSectionRow>
-          <PanelSectionRow>
-            <ButtonItem
-              layout="below"
-              onClick={() => {
-                controller.cycleYouTubeQualityForCurrent();
-                controller.refresh();
-              }}
-            >
-              {tr("youtubeQuality", { value: getYouTubeQualityLabel(currentYouTubeQuality) })}
-            </ButtonItem>
-          </PanelSectionRow>
-          <PanelSectionRow>
-            <TextField
-              label={tr("steamAppIdSource")}
-              value={steamAppInput}
-              mustBeURL={false}
-              bShowClearAction
-              onChange={(event) => setSteamAppInput(event.currentTarget.value)}
-            />
-          </PanelSectionRow>
-          <PanelSectionRow>
-            <ButtonItem
-              layout="below"
-              onClick={() => {
-                if (controller.setSteamAppForCurrent(steamAppInput)) {
-                  controller.refresh();
-                }
-              }}
-            >
-              {tr("saveSteamAppId")}
-            </ButtonItem>
-          </PanelSectionRow>
-          <PanelSectionRow>
-            <ButtonItem
-              layout="below"
-              onClick={() => {
-                controller.clearSteamAppForCurrent();
-                setSteamAppInput("");
-                controller.refresh();
-              }}
-            >
-              {tr("originalAppId")}
-            </ButtonItem>
-          </PanelSectionRow>
-          {snapshot.steamMovies?.length ? (
-            <>
-              <PanelSectionRow>
-                <ButtonItem layout="below" onClick={() => controller.cycleSteamMovieForCurrent()}>
-                  {tr("sourceSteam")}: {currentSteamMovie?.name ?? snapshot.selectedSteamMovieId ?? tr("auto")}
-                </ButtonItem>
-              </PanelSectionRow>
-              <PanelSectionRow>
-                <div style={{ fontSize: "11px", opacity: 0.62, lineHeight: 1.32 }}>
-                  {tr("steamVideosAvailable", { count: snapshot.steamMovies.length })}
-                </div>
-              </PanelSectionRow>
-              {snapshot.steamMovies.map((movie, index) => (
-                <PanelSectionRow key={movie.id}>
-                  <ButtonItem
-                    layout="below"
-                    onClick={() => {
-                      controller.setSteamMovieForCurrent(movie.id);
-                      controller.refresh();
-                    }}
-                  >
-                    {movie.id === snapshot.selectedSteamMovieId ? tr("activeSteamVideoPrefix") : ""}
-                    {index + 1}. {movie.name}
-                  </ButtonItem>
-                </PanelSectionRow>
-              ))}
-              <PanelSectionRow>
-                <ButtonItem
-                  layout="below"
-                  onClick={() => {
-                    controller.clearSteamMovieForCurrent();
-                    controller.refresh();
-                  }}
-                >
-                  {tr("steamTrailerAuto")}
-                </ButtonItem>
-              </PanelSectionRow>
-            </>
-          ) : null}
           <PanelSectionRow>
             <TextField
               label={tr("trimStart")}
@@ -4221,12 +4299,29 @@ function Content() {
               {tr("saveTrims")}
             </ButtonItem>
           </PanelSectionRow>
+          {snapshot.steamMovies?.length ? (
+            <PanelSectionRow>
+              <DropdownItem
+                label={tr("steamTrailer")}
+                rgOptions={snapshot.steamMovies.map((movie, index) => ({
+                  data: movie.id,
+                  label: `${index + 1}. ${movie.name}`
+                }))}
+                selectedOption={currentSteamMovie?.id ?? snapshot.selectedSteamMovieId ?? ""}
+                onChange={(option) => {
+                  if (typeof option.data === "string") {
+                    controller.setSteamMovieForCurrent(option.data);
+                    controller.refresh();
+                  }
+                }}
+              />
+            </PanelSectionRow>
+          ) : null}
           <PanelSectionRow>
             <TextField
               label={tr("youtubeForGame")}
               value={youtubeInput}
               mustBeURL={false}
-              bShowClearAction
               onChange={(event) => setYoutubeInput(event.currentTarget.value)}
             />
           </PanelSectionRow>
@@ -4242,26 +4337,8 @@ function Content() {
               {tr("saveYouTubeLink")}
             </ButtonItem>
           </PanelSectionRow>
-          <PanelSectionRow>
-            <ButtonItem
-              layout="below"
-              onClick={() => {
-                controller.clearYouTubeForCurrent();
-                setYoutubeInput("");
-                controller.refresh();
-              }}
-            >
-              {tr("clearYouTubeLink")}
-            </ButtonItem>
-          </PanelSectionRow>
         </>
       ) : null}
-
-      <PanelSectionRow>
-        <ButtonItem layout="below" onClick={() => controller.refresh()}>
-          {tr("retryNow")}
-        </ButtonItem>
-      </PanelSectionRow>
     </PanelSection>
   );
 }

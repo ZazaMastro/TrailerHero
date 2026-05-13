@@ -106,12 +106,26 @@ class Plugin:
         movie_id = movie["id"]
         shared_base = f"https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{movie_id}"
         cdn_base = f"https://cdn.akamai.steamstatic.com/steam/apps/{movie_id}"
-        candidates = [
-            f"{shared_base}/movie480.mp4",
-            f"{shared_base}/movie_max.mp4",
-            f"{cdn_base}/movie480.mp4",
-            f"{cdn_base}/movie_max.mp4",
+        direct_movie_files = [
+            "movie2160.mp4",
+            "movie1440.mp4",
+            "movie1080.mp4",
+            "movie720.mp4",
+            "movie_max.mp4",
+            "movie480.mp4",
         ]
+        candidates = [
+            *(f"{shared_base}/{file_name}" for file_name in direct_movie_files),
+            *(f"{cdn_base}/{file_name}" for file_name in direct_movie_files),
+        ]
+
+        dash_h264 = movie.get("dash_h264")
+        if dash_h264:
+            candidates.append(dash_h264)
+
+        dash_av1 = movie.get("dash_av1")
+        if dash_av1:
+            candidates.append(dash_av1)
 
         hls_url = movie.get("hls_h264")
         if hls_url:
@@ -128,7 +142,49 @@ class Plugin:
         if not clean_query:
             return {"ok": False, "error": "Query YouTube vuota"}
 
-        search_query = f"{clean_query} official trailer game"
+        searches = [
+            f"\"{clean_query}\" official trailer game 4K 2160p",
+            f"\"{clean_query}\" official trailer game 4K",
+            f"\"{clean_query}\" official trailer game"
+        ]
+        best = None
+        best_query = searches[-1]
+        for search_query in searches:
+            results = self._search_youtube_results(search_query)
+            if not results:
+                continue
+
+            strict_results = [
+                result for result in results
+                if self._matches_game_title(clean_query, result)
+            ]
+            if not strict_results:
+                continue
+
+            strict_results.sort(
+                key=lambda item: self._score_youtube_result(clean_query, item),
+                reverse=True
+            )
+            best = strict_results[0]
+            best_query = search_query
+            break
+
+        if not best:
+            return {
+                "ok": False,
+                "error": "Nessun risultato YouTube coerente con il titolo del gioco"
+            }
+
+        return {
+            "ok": True,
+            "query": best_query,
+            "videoId": best.get("videoId"),
+            "title": best.get("title") or "YouTube trailer",
+            "channel": best.get("channel") or "",
+            "url": f"https://www.youtube.com/watch?v={best.get('videoId')}"
+        }
+
+    def _search_youtube_results(self, search_query: str) -> list:
         url = (
             "https://www.youtube.com/results?"
             + urllib.parse.urlencode({
@@ -155,12 +211,6 @@ class Plugin:
         data = self._extract_yt_initial_data(html)
         results = []
         self._collect_youtube_results(data, results)
-        if not results:
-            return {
-                "ok": False,
-                "error": "Nessun risultato YouTube leggibile"
-            }
-
         seen = set()
         unique_results = []
         for result in results:
@@ -170,17 +220,7 @@ class Plugin:
             seen.add(video_id)
             result["rank"] = len(unique_results)
             unique_results.append(result)
-
-        unique_results.sort(key=lambda item: self._score_youtube_result(clean_query, item), reverse=True)
-        best = unique_results[0]
-        return {
-            "ok": True,
-            "query": search_query,
-            "videoId": best.get("videoId"),
-            "title": best.get("title") or "YouTube trailer",
-            "channel": best.get("channel") or "",
-            "url": f"https://www.youtube.com/watch?v={best.get('videoId')}"
-        }
+        return unique_results
 
     def _extract_yt_initial_data(self, html: str) -> dict:
         marker = "var ytInitialData = "
@@ -245,6 +285,37 @@ class Plugin:
             for value in node:
                 self._collect_youtube_results(value, results)
 
+    def _normalize_title_text(self, value: str) -> str:
+        return " ".join(
+            word for word in re.split(r"[^a-z0-9]+", value.lower())
+            if word and word not in {
+                "the", "and", "game", "official", "trailer", "launch",
+                "announcement", "reveal", "gameplay", "video", "4k", "2160p",
+                "1440p", "1080p", "hd", "uhd"
+            }
+        )
+
+    def _matches_game_title(self, game_title: str, result: dict) -> bool:
+        expected = self._normalize_title_text(game_title)
+        title = self._normalize_title_text(result.get("title") or "")
+        channel = self._normalize_title_text(result.get("channel") or "")
+        if not expected or not title:
+            return False
+
+        expected_words = expected.split()
+        title_words = set(title.split())
+        if expected in title:
+            return True
+
+        if len(expected_words) == 1:
+            word = expected_words[0]
+            return word in title_words
+
+        matched = sum(1 for word in expected_words if word in title_words)
+        if expected_words[0] not in title_words:
+            return False
+        return matched >= max(2, len(expected_words) - 1)
+
     def _score_youtube_result(self, query: str, result: dict) -> int:
         title = (result.get("title") or "").lower()
         channel = (result.get("channel") or "").lower()
@@ -263,6 +334,10 @@ class Plugin:
         bonuses = {
             "official": 18,
             "trailer": 16,
+            "4k": 14,
+            "2160p": 14,
+            "uhd": 10,
+            "1440p": 8,
             "launch trailer": 10,
             "announcement trailer": 8,
             "reveal trailer": 8,
@@ -291,6 +366,9 @@ class Plugin:
         for text, penalty in penalties.items():
             if text in title:
                 score -= penalty
+
+        if not self._matches_game_title(query, result):
+            score -= 100
 
         if "official" in channel:
             score += 8
