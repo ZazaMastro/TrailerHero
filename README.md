@@ -1,4 +1,4 @@
-# TrailerHero
+# TrailerHero (Playhub)
 
 TrailerHero is a Decky Loader plugin that makes Steam Big Picture feel a little more like a console dashboard.
 
